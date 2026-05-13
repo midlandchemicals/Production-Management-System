@@ -69,9 +69,13 @@ export default function App() {
               Sign In
             </button>
           </form>
-          <p className="mt-6 text-xs text-center text-slate-500">
-            Demo password: admin123
-          </p>
+          <button
+            type="button"
+            className="mt-6 w-full cursor-pointer text-xs text-center text-slate-500 hover:text-slate-700 transition-colors"
+            onClick={() => alert('Please contact the administrator to reset your password.')}
+          >
+            Forgot password?
+          </button>
           <div className="mt-8 pt-6 border-t border-slate-200">
             <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
               <Lock className="w-3 h-3" />

@@ -1,12 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Save, X, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
-import { supabase } from '../../../utils/supabase';
+import { useState, useEffect, useCallback } from "react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Save,
+  X,
+  Loader2,
+  RefreshCw,
+  AlertCircle,
+} from "lucide-react";
+import { supabase } from "../../../utils/supabase";
 
 interface RawMaterial {
   id: number;
-  'material-name': string | null;
+  "material-name": string | null;
   unit: string | null;
-  'price-per-unit': number | null;
+  "price-per-unit": number | null;
   created_at: string;
 }
 
@@ -18,9 +27,9 @@ export function RawMaterialsModule() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    unit: '',
-    pricePerUnit: '',
+    name: "",
+    unit: "",
+    pricePerUnit: "",
   });
 
   // Fetch all materials from Supabase
@@ -28,9 +37,9 @@ export function RawMaterialsModule() {
     try {
       setError(null);
       const { data, error: fetchError } = await supabase
-        .from('rawMaterial')
-        .select('*')
-        .order('material-name', { ascending: true });
+        .from("rawMaterial")
+        .select("*")
+        .order("material-name", { ascending: true });
 
       if (fetchError) {
         throw fetchError;
@@ -38,9 +47,10 @@ export function RawMaterialsModule() {
 
       setMaterials(data || []);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch materials';
+      const message =
+        err instanceof Error ? err.message : "Failed to fetch materials";
       setError(message);
-      console.error('Error fetching materials:', err);
+      console.error("Error fetching materials:", err);
     } finally {
       setLoading(false);
     }
@@ -52,38 +62,40 @@ export function RawMaterialsModule() {
 
     // Subscribe to real-time changes on the rawMaterial table
     const channel = supabase
-      .channel('rawMaterial-changes')
+      .channel("rawMaterial-changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'rawMaterial',
+          event: "*",
+          schema: "public",
+          table: "rawMaterial",
         },
         (payload) => {
-          if (payload.eventType === 'INSERT') {
+          if (payload.eventType === "INSERT") {
             setMaterials((prev) => {
               const newMaterial = payload.new as RawMaterial;
               // Avoid duplicates
               if (prev.some((m) => m.id === newMaterial.id)) return prev;
               return [...prev, newMaterial].sort((a, b) =>
-                (a['material-name'] || '').localeCompare(b['material-name'] || '')
+                (a["material-name"] || "").localeCompare(
+                  b["material-name"] || "",
+                ),
               );
             });
-          } else if (payload.eventType === 'UPDATE') {
+          } else if (payload.eventType === "UPDATE") {
             setMaterials((prev) =>
               prev.map((m) =>
                 m.id === (payload.new as RawMaterial).id
                   ? (payload.new as RawMaterial)
-                  : m
-              )
+                  : m,
+              ),
             );
-          } else if (payload.eventType === 'DELETE') {
+          } else if (payload.eventType === "DELETE") {
             setMaterials((prev) =>
-              prev.filter((m) => m.id !== (payload.old as { id: number }).id)
+              prev.filter((m) => m.id !== (payload.old as { id: number }).id),
             );
           }
-        }
+        },
       )
       .subscribe();
 
@@ -95,28 +107,27 @@ export function RawMaterialsModule() {
   // Add a new material to Supabase
   const handleAdd = async () => {
     if (!formData.name || !formData.unit || !formData.pricePerUnit) {
-      alert('Please fill in all fields');
+      alert("Please fill in all fields");
       return;
     }
 
     setSaving(true);
     try {
-      const { error: insertError } = await supabase
-        .from('rawMaterial')
-        .insert({
-          'material-name': formData.name,
-          unit: formData.unit,
-          'price-per-unit': parseFloat(formData.pricePerUnit),
-        });
+      const { error: insertError } = await supabase.from("rawMaterial").insert({
+        "material-name": formData.name,
+        unit: formData.unit,
+        "price-per-unit": parseFloat(formData.pricePerUnit),
+      });
 
       if (insertError) throw insertError;
 
-      setFormData({ name: '', unit: '', pricePerUnit: '' });
+      setFormData({ name: "", unit: "", pricePerUnit: "" });
       setIsAdding(false);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to add material';
+      const message =
+        err instanceof Error ? err.message : "Failed to add material";
       alert(`Error adding material: ${message}`);
-      console.error('Error adding material:', err);
+      console.error("Error adding material:", err);
     } finally {
       setSaving(false);
     }
@@ -127,9 +138,9 @@ export function RawMaterialsModule() {
     const material = materials.find((m) => m.id === id);
     if (material) {
       setFormData({
-        name: material['material-name'] || '',
-        unit: material.unit || '',
-        pricePerUnit: material['price-per-unit']?.toString() || '',
+        name: material["material-name"] || "",
+        unit: material.unit || "",
+        pricePerUnit: material["price-per-unit"]?.toString() || "",
       });
       setEditingId(id);
     }
@@ -137,30 +148,36 @@ export function RawMaterialsModule() {
 
   // Update an existing material in Supabase
   const handleUpdate = async () => {
-    if (!formData.name || !formData.unit || !formData.pricePerUnit || editingId === null) {
-      alert('Please fill in all fields');
+    if (
+      !formData.name ||
+      !formData.unit ||
+      !formData.pricePerUnit ||
+      editingId === null
+    ) {
+      alert("Please fill in all fields");
       return;
     }
 
     setSaving(true);
     try {
       const { error: updateError } = await supabase
-        .from('rawMaterial')
+        .from("rawMaterial")
         .update({
-          'material-name': formData.name,
+          "material-name": formData.name,
           unit: formData.unit,
-          'price-per-unit': parseFloat(formData.pricePerUnit),
+          "price-per-unit": parseFloat(formData.pricePerUnit),
         })
-        .eq('id', editingId);
+        .eq("id", editingId);
 
       if (updateError) throw updateError;
 
-      setFormData({ name: '', unit: '', pricePerUnit: '' });
+      setFormData({ name: "", unit: "", pricePerUnit: "" });
       setEditingId(null);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to update material';
+      const message =
+        err instanceof Error ? err.message : "Failed to update material";
       alert(`Error updating material: ${message}`);
-      console.error('Error updating material:', err);
+      console.error("Error updating material:", err);
     } finally {
       setSaving(false);
     }
@@ -168,25 +185,25 @@ export function RawMaterialsModule() {
 
   // Delete a material from Supabase
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this material?')) return;
+    if (!confirm("Are you sure you want to delete this material?")) return;
 
     try {
       const { error: deleteError } = await supabase
-        .from('rawMaterial')
+        .from("rawMaterial")
         .delete()
-        .eq('id', id);
+        .eq("id", id);
 
       if (deleteError) throw deleteError;
-
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to delete material';
+      const message =
+        err instanceof Error ? err.message : "Failed to delete material";
       alert(`Error deleting material: ${message}`);
-      console.error('Error deleting material:', err);
+      console.error("Error deleting material:", err);
     }
   };
 
   const handleCancel = () => {
-    setFormData({ name: '', unit: '', pricePerUnit: '' });
+    setFormData({ name: "", unit: "", pricePerUnit: "" });
     setIsAdding(false);
     setEditingId(null);
   };
@@ -205,25 +222,20 @@ export function RawMaterialsModule() {
 
   return (
     <div className="max-w-6xl">
-      <div className="flex items-center justify-between mb-6">
+      <div className="sticky top-0 z-10 bg-slate-50 -mx-6 px-6 -mt-6 pt-6 pb-4 mb-6 flex items-center justify-between border-b border-slate-200 shadow-sm">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Raw Materials Database</h2>
+          <h2 className="text-2xl font-bold text-slate-900">
+            Raw Materials Database
+          </h2>
           <p className="text-sm text-slate-600 mt-1">
             Manage your raw material inventory and pricing
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* <button
-            onClick={fetchMaterials}
-            className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            title="Refresh data"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button> */}
           {!isAdding && editingId === null && (
             <button
               onClick={() => setIsAdding(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
             >
               <Plus className="w-4 h-4" />
               Add Material
@@ -250,7 +262,7 @@ export function RawMaterialsModule() {
       {(isAdding || editingId !== null) && (
         <div className="mb-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">
-            {isAdding ? 'Add New Material' : 'Edit Material'}
+            {isAdding ? "Add New Material" : "Edit Material"}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
@@ -260,7 +272,9 @@ export function RawMaterialsModule() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 placeholder="e.g. Ethanol"
               />
@@ -271,7 +285,9 @@ export function RawMaterialsModule() {
               </label>
               <select
                 value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, unit: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               >
                 <option value="">Select unit</option>
@@ -292,7 +308,9 @@ export function RawMaterialsModule() {
                 type="number"
                 step="0.01"
                 value={formData.pricePerUnit}
-                onChange={(e) => setFormData({ ...formData, pricePerUnit: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, pricePerUnit: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 placeholder="0.00"
               />
@@ -309,7 +327,7 @@ export function RawMaterialsModule() {
               ) : (
                 <Save className="w-4 h-4" />
               )}
-              {isAdding ? 'Add Material' : 'Update Material'}
+              {isAdding ? "Add Material" : "Update Material"}
             </button>
             <button
               onClick={handleCancel}
@@ -324,7 +342,7 @@ export function RawMaterialsModule() {
       )}
 
       {/* Materials Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 pt-5 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -349,28 +367,38 @@ export function RawMaterialsModule() {
             <tbody className="divide-y divide-slate-200">
               {materials.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
-                    No materials found in the database. Click "Add Material" to get started.
+                  <td
+                    colSpan={5}
+                    className="px-6 py-12 text-center text-slate-500"
+                  >
+                    No materials found in the database. Click "Add Material" to
+                    get started.
                   </td>
                 </tr>
               ) : (
                 materials.map((material) => (
-                  <tr key={material.id} className="hover:bg-slate-50 transition-colors">
+                  <tr
+                    key={material.id}
+                    className="hover:bg-slate-50 transition-colors"
+                  >
                     <td className="px-6 py-4 font-medium text-slate-900">
-                      {material['material-name'] || '—'}
+                      {material["material-name"] || "—"}
                     </td>
                     <td className="px-6 py-4 text-slate-600">
-                      {material.unit || '—'}
+                      {material.unit || "—"}
                     </td>
                     <td className="px-6 py-4 text-slate-900">
-                      £{(material['price-per-unit'] ?? 0).toFixed(2)}
+                      £{(material["price-per-unit"] ?? 0).toFixed(2)}
                     </td>
                     <td className="px-6 py-4 text-slate-600">
-                      {new Date(material.created_at).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
+                      {new Date(material.created_at).toLocaleDateString(
+                        "en-GB",
+                        {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        },
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -398,7 +426,8 @@ export function RawMaterialsModule() {
 
       <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <p className="text-sm text-blue-800">
-          <strong>Total Materials:</strong> {materials.length} • Synced with Supabase in real-time
+          <strong>Total Materials:</strong> {materials.length} • Synced with
+          Supabase in real-time
         </p>
       </div>
     </div>

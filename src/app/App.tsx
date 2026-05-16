@@ -1,36 +1,36 @@
-import { useState, useEffect } from 'react';
-import { RawMaterialsModule } from './components/RawMaterialsModule';
-import { FormulationModule } from './components/FormulationModule';
-import { ProductionCalculator } from './components/ProductionCalculator';
-import { OrderBook } from './components/OrderBook';
-import { Lock, Database, Calculator, BookOpen } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { RawMaterialsModule } from "./components/RawMaterialsModule";
+import { FormulationModule } from "./components/FormulationModule";
+import { ProductionCalculator } from "./components/ProductionCalculator";
+import { OrderBook } from "./components/OrderBook";
+import { Lock, Database, Calculator, BookOpen } from "lucide-react";
 
 export default function App() {
-  const [activeModule, setActiveModule] = useState('materials');
+  const [activeModule, setActiveModule] = useState("materials");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
-    const auth = sessionStorage.getItem('authenticated');
-    if (auth === 'true') {
+    const auth = sessionStorage.getItem("authenticated");
+    if (auth === "true") {
       setIsAuthenticated(true);
     }
   }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'admin123') {
+    if (password === "admin123") {
       setIsAuthenticated(true);
-      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem("authenticated", "true");
     } else {
-      alert('Incorrect password');
+      alert("Incorrect password");
     }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    sessionStorage.removeItem('authenticated');
-    setPassword('');
+    sessionStorage.removeItem("authenticated");
+    setPassword("");
   };
 
   if (!isAuthenticated) {
@@ -72,7 +72,9 @@ export default function App() {
           <button
             type="button"
             className="mt-6 w-full cursor-pointer text-xs text-center text-slate-500 hover:text-slate-700 transition-colors"
-            onClick={() => alert('Please contact the administrator to reset your password.')}
+            onClick={() =>
+              alert("Please contact the administrator to reset your password.")
+            }
           >
             Forgot password?
           </button>
@@ -120,44 +122,44 @@ export default function App() {
         <aside className="w-64 bg-white border-r border-slate-200 p-4">
           <nav className="space-y-2">
             <button
-              onClick={() => setActiveModule('materials')}
+              onClick={() => setActiveModule("materials")}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeModule === 'materials'
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-700 hover:bg-slate-50'
+                activeModule === "materials"
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               <Database className="w-5 h-5" />
               <span className="font-medium">Raw Materials</span>
             </button>
             <button
-              onClick={() => setActiveModule('formulations')}
+              onClick={() => setActiveModule("formulations")}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeModule === 'formulations'
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-700 hover:bg-slate-50'
+                activeModule === "formulations"
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               <BookOpen className="w-5 h-5" />
               <span className="font-medium">Formulations</span>
             </button>
             <button
-              onClick={() => setActiveModule('calculator')}
+              onClick={() => setActiveModule("calculator")}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeModule === 'calculator'
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-700 hover:bg-slate-50'
+                activeModule === "calculator"
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               <Calculator className="w-5 h-5" />
               <span className="font-medium">Production Calculator</span>
             </button>
             <button
-              onClick={() => setActiveModule('orders')}
+              onClick={() => setActiveModule("orders")}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeModule === 'orders'
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-700 hover:bg-slate-50'
+                activeModule === "orders"
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               <BookOpen className="w-5 h-5" />
@@ -168,7 +170,9 @@ export default function App() {
           <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <div className="flex items-center gap-2 mb-2">
               <Lock className="w-4 h-4 text-slate-600" />
-              <span className="text-xs font-medium text-slate-700">Security Status</span>
+              <span className="text-xs font-medium text-slate-700">
+                Security Status
+              </span>
             </div>
             <p className="text-xs text-slate-600">
               Session active • Data encrypted
@@ -177,11 +181,11 @@ export default function App() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto p-6">
-          {activeModule === 'materials' && <RawMaterialsModule />}
-          {activeModule === 'formulations' && <FormulationModule />}
-          {activeModule === 'calculator' && <ProductionCalculator />}
-          {activeModule === 'orders' && <OrderBook />}
+        <main className="flex-1 overflow-auto p-6 pt-0">
+          {activeModule === "materials" && <RawMaterialsModule />}
+          {activeModule === "formulations" && <FormulationModule />}
+          {activeModule === "calculator" && <ProductionCalculator />}
+          {activeModule === "orders" && <OrderBook />}
         </main>
       </div>
     </div>

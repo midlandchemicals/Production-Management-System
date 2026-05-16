@@ -258,85 +258,96 @@ export function RawMaterialsModule() {
         </div>
       )}
 
-      {/* Add / Edit Form */}
+      {/* Add / Edit Form Modal */}
       {(isAdding || editingId !== null) && (
-        <div className="mb-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">
-            {isAdding ? "Add New Material" : "Edit Material"}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Material Name
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="e.g. Ethanol"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Unit of Measurement
-              </label>
-              <select
-                value={formData.unit}
-                onChange={(e) =>
-                  setFormData({ ...formData, unit: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <h3 className="text-lg font-semibold text-slate-900">
+                {isAdding ? "Add New Material" : "Edit Material"}
+              </h3>
+              <button
+                onClick={handleCancel}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <option value="">Select unit</option>
-                <option value="LTR">LTR</option>
-                <option value="KG">KG</option>
-                <option value="G">G</option>
-                <option value="each">Each</option>
-                <option value="BUCKET">Bucket</option>
-                <option value="SACK">Sack</option>
-                <option value="10kg">10kg</option>
-              </select>
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Price per Unit (£)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.pricePerUnit}
-                onChange={(e) =>
-                  setFormData({ ...formData, pricePerUnit: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="0.00"
-              />
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Material Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="e.g. Ethanol"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Unit of Measurement
+                  </label>
+                  <select
+                    value={formData.unit}
+                    onChange={(e) =>
+                      setFormData({ ...formData, unit: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  >
+                    <option value="">Select unit</option>
+                    <option value="LTR">LTR</option>
+                    <option value="KG">KG</option>
+                    <option value="G">G</option>
+                    <option value="each">Each</option>
+                    <option value="BUCKET">Bucket</option>
+                    <option value="SACK">Sack</option>
+                    <option value="10kg">10kg</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Price per Unit (£)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.pricePerUnit}
+                    onChange={(e) =>
+                      setFormData({ ...formData, pricePerUnit: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 disabled:opacity-50 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={isAdding ? handleAdd : handleUpdate}
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
+                >
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {isAdding ? "Add Material" : "Update Material"}
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={isAdding ? handleAdd : handleUpdate}
-              disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              {isAdding ? "Add Material" : "Update Material"}
-            </button>
-            <button
-              onClick={handleCancel}
-              disabled={saving}
-              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 disabled:opacity-50"
-            >
-              <X className="w-4 h-4" />
-              Cancel
-            </button>
           </div>
         </div>
       )}

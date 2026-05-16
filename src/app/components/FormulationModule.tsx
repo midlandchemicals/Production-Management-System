@@ -291,7 +291,7 @@ export function FormulationModule() {
 
   return (
     <div className="max-w-6xl">
-      <div className="sticky top-0 z-10 bg-slate-50 -mx-6 px-6 -mt-6 pt-6 pb-4 mb-6 flex items-center justify-between border-b border-slate-200 shadow-sm">
+      <div className="sticky top-0 z-10 bg-slate-50 -mx-6 px-6 -mt-6 pt-6 pb-4 mb-12 flex items-center justify-between border-b border-slate-200 shadow-sm">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Product Formulations</h2>
           <p className="text-sm text-slate-600 mt-1">

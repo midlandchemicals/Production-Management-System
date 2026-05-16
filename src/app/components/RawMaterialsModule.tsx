@@ -1,120 +1,187 @@
-import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Save, X } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Pencil, Trash2, Save, X, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { supabase } from '../../../utils/supabase';
 
 interface RawMaterial {
-  id: string;
-  name: string;
-  unit: string;
-  pricePerUnit: number;
-  lastUpdated: string;
+  id: number;
+  'material-name': string | null;
+  unit: string | null;
+  'price-per-unit': number | null;
+  created_at: string;
 }
 
 export function RawMaterialsModule() {
   const [materials, setMaterials] = useState<RawMaterial[]>([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     unit: '',
     pricePerUnit: '',
   });
 
-  useEffect(() => {
-    const stored = localStorage.getItem('rawMaterials');
-    if (stored) {
-      setMaterials(JSON.parse(stored));
-    } else {
-      // Sample data
-      const sampleData: RawMaterial[] = [
-        {
-          id: '1',
-          name: 'Ethanol',
-          unit: 'Litre',
-          pricePerUnit: 2.50,
-          lastUpdated: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          name: 'Distilled Water',
-          unit: 'Litre',
-          pricePerUnit: 0.15,
-          lastUpdated: new Date().toISOString(),
-        },
-        {
-          id: '3',
-          name: 'Glycerol',
-          unit: 'Kilogram',
-          pricePerUnit: 3.75,
-          lastUpdated: new Date().toISOString(),
-        },
-      ];
-      setMaterials(sampleData);
-      localStorage.setItem('rawMaterials', JSON.stringify(sampleData));
+  // Fetch all materials from Supabase
+  const fetchMaterials = useCallback(async () => {
+    try {
+      setError(null);
+      const { data, error: fetchError } = await supabase
+        .from('rawMaterial')
+        .select('*')
+        .order('material-name', { ascending: true });
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      setMaterials(data || []);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch materials';
+      setError(message);
+      console.error('Error fetching materials:', err);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  const saveMaterials = (updatedMaterials: RawMaterial[]) => {
-    setMaterials(updatedMaterials);
-    localStorage.setItem('rawMaterials', JSON.stringify(updatedMaterials));
-  };
+  // Initial fetch + real-time subscription
+  useEffect(() => {
+    fetchMaterials();
 
-  const handleAdd = () => {
+    // Subscribe to real-time changes on the rawMaterial table
+    const channel = supabase
+      .channel('rawMaterial-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rawMaterial',
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setMaterials((prev) => {
+              const newMaterial = payload.new as RawMaterial;
+              // Avoid duplicates
+              if (prev.some((m) => m.id === newMaterial.id)) return prev;
+              return [...prev, newMaterial].sort((a, b) =>
+                (a['material-name'] || '').localeCompare(b['material-name'] || '')
+              );
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setMaterials((prev) =>
+              prev.map((m) =>
+                m.id === (payload.new as RawMaterial).id
+                  ? (payload.new as RawMaterial)
+                  : m
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setMaterials((prev) =>
+              prev.filter((m) => m.id !== (payload.old as { id: number }).id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchMaterials]);
+
+  // Add a new material to Supabase
+  const handleAdd = async () => {
     if (!formData.name || !formData.unit || !formData.pricePerUnit) {
       alert('Please fill in all fields');
       return;
     }
 
-    const newMaterial: RawMaterial = {
-      id: Date.now().toString(),
-      name: formData.name,
-      unit: formData.unit,
-      pricePerUnit: parseFloat(formData.pricePerUnit),
-      lastUpdated: new Date().toISOString(),
-    };
+    setSaving(true);
+    try {
+      const { error: insertError } = await supabase
+        .from('rawMaterial')
+        .insert({
+          'material-name': formData.name,
+          unit: formData.unit,
+          'price-per-unit': parseFloat(formData.pricePerUnit),
+        });
 
-    saveMaterials([...materials, newMaterial]);
-    setFormData({ name: '', unit: '', pricePerUnit: '' });
-    setIsAdding(false);
+      if (insertError) throw insertError;
+
+      setFormData({ name: '', unit: '', pricePerUnit: '' });
+      setIsAdding(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to add material';
+      alert(`Error adding material: ${message}`);
+      console.error('Error adding material:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleEdit = (id: string) => {
+  // Start editing a material
+  const handleEdit = (id: number) => {
     const material = materials.find((m) => m.id === id);
     if (material) {
       setFormData({
-        name: material.name,
-        unit: material.unit,
-        pricePerUnit: material.pricePerUnit.toString(),
+        name: material['material-name'] || '',
+        unit: material.unit || '',
+        pricePerUnit: material['price-per-unit']?.toString() || '',
       });
       setEditingId(id);
     }
   };
 
-  const handleUpdate = () => {
-    if (!formData.name || !formData.unit || !formData.pricePerUnit || !editingId) {
+  // Update an existing material in Supabase
+  const handleUpdate = async () => {
+    if (!formData.name || !formData.unit || !formData.pricePerUnit || editingId === null) {
       alert('Please fill in all fields');
       return;
     }
 
-    const updatedMaterials = materials.map((m) =>
-      m.id === editingId
-        ? {
-            ...m,
-            name: formData.name,
-            unit: formData.unit,
-            pricePerUnit: parseFloat(formData.pricePerUnit),
-            lastUpdated: new Date().toISOString(),
-          }
-        : m
-    );
+    setSaving(true);
+    try {
+      const { error: updateError } = await supabase
+        .from('rawMaterial')
+        .update({
+          'material-name': formData.name,
+          unit: formData.unit,
+          'price-per-unit': parseFloat(formData.pricePerUnit),
+        })
+        .eq('id', editingId);
 
-    saveMaterials(updatedMaterials);
-    setFormData({ name: '', unit: '', pricePerUnit: '' });
-    setEditingId(null);
+      if (updateError) throw updateError;
+
+      setFormData({ name: '', unit: '', pricePerUnit: '' });
+      setEditingId(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update material';
+      alert(`Error updating material: ${message}`);
+      console.error('Error updating material:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this material?')) {
-      saveMaterials(materials.filter((m) => m.id !== id));
+  // Delete a material from Supabase
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this material?')) return;
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('rawMaterial')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) throw deleteError;
+
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete material';
+      alert(`Error deleting material: ${message}`);
+      console.error('Error deleting material:', err);
     }
   };
 
@@ -123,6 +190,18 @@ export function RawMaterialsModule() {
     setIsAdding(false);
     setEditingId(null);
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="max-w-6xl flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <p className="text-slate-600">Loading materials from database...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl">
@@ -133,18 +212,42 @@ export function RawMaterialsModule() {
             Manage your raw material inventory and pricing
           </p>
         </div>
-        {!isAdding && !editingId && (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+        <div className="flex items-center gap-2">
+          {/* <button
+            onClick={fetchMaterials}
+            className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Refresh data"
           >
-            <Plus className="w-4 h-4" />
-            Add Material
-          </button>
-        )}
+            <RefreshCw className="w-5 h-5" />
+          </button> */}
+          {!isAdding && editingId === null && (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Material
+            </button>
+          )}
+        </div>
       </div>
 
-      {(isAdding || editingId) && (
+      {/* Error Banner */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 rounded-xl border border-red-200 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <p className="text-sm text-red-800">{error}</p>
+          <button
+            onClick={fetchMaterials}
+            className="ml-auto px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Add / Edit Form */}
+      {(isAdding || editingId !== null) && (
         <div className="mb-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">
             {isAdding ? 'Add New Material' : 'Edit Material'}
@@ -172,11 +275,13 @@ export function RawMaterialsModule() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               >
                 <option value="">Select unit</option>
-                <option value="Litre">Litre</option>
-                <option value="Kilogram">Kilogram</option>
-                <option value="Tonne">Tonne</option>
-                <option value="Gram">Gram</option>
-                <option value="Millilitre">Millilitre</option>
+                <option value="LTR">LTR</option>
+                <option value="KG">KG</option>
+                <option value="G">G</option>
+                <option value="each">Each</option>
+                <option value="BUCKET">Bucket</option>
+                <option value="SACK">Sack</option>
+                <option value="10kg">10kg</option>
               </select>
             </div>
             <div>
@@ -196,14 +301,20 @@ export function RawMaterialsModule() {
           <div className="flex gap-3">
             <button
               onClick={isAdding ? handleAdd : handleUpdate}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Save className="w-4 h-4" />
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
               {isAdding ? 'Add Material' : 'Update Material'}
             </button>
             <button
               onClick={handleCancel}
-              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2"
+              disabled={saving}
+              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <X className="w-4 h-4" />
               Cancel
@@ -212,6 +323,7 @@ export function RawMaterialsModule() {
         </div>
       )}
 
+      {/* Materials Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -227,7 +339,7 @@ export function RawMaterialsModule() {
                   Price per Unit
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
-                  Last Updated
+                  Added On
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-slate-700 uppercase tracking-wider">
                   Actions
@@ -238,19 +350,23 @@ export function RawMaterialsModule() {
               {materials.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
-                    No materials added yet. Click "Add Material" to get started.
+                    No materials found in the database. Click "Add Material" to get started.
                   </td>
                 </tr>
               ) : (
                 materials.map((material) => (
                   <tr key={material.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{material.name}</td>
-                    <td className="px-6 py-4 text-slate-600">{material.unit}</td>
-                    <td className="px-6 py-4 text-slate-900">
-                      £{material.pricePerUnit.toFixed(2)}
+                    <td className="px-6 py-4 font-medium text-slate-900">
+                      {material['material-name'] || '—'}
                     </td>
                     <td className="px-6 py-4 text-slate-600">
-                      {new Date(material.lastUpdated).toLocaleDateString('en-GB', {
+                      {material.unit || '—'}
+                    </td>
+                    <td className="px-6 py-4 text-slate-900">
+                      £{(material['price-per-unit'] ?? 0).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 text-slate-600">
+                      {new Date(material.created_at).toLocaleDateString('en-GB', {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',
@@ -282,8 +398,7 @@ export function RawMaterialsModule() {
 
       <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <p className="text-sm text-blue-800">
-          <strong>Total Materials:</strong> {materials.length} • Data is stored locally and
-          encrypted in your browser
+          <strong>Total Materials:</strong> {materials.length} • Synced with Supabase in real-time
         </p>
       </div>
     </div>

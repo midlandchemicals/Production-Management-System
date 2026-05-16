@@ -1,29 +1,31 @@
-import { useState, useEffect } from 'react';
-import { Calculator, Save } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Calculator, Save, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../../../utils/supabase';
 
 interface RawMaterial {
-  id: string;
-  name: string;
-  unit: string;
-  pricePerUnit: number;
+  id: number;
+  "material-name": string | null;
+  unit: string | null;
+  "price-per-unit": number | null;
 }
 
 interface FormulationMaterial {
-  materialId: string;
+  id?: number;
+  material_name: string;
   quantity: number;
+  formulation_id?: number;
 }
 
 interface Formulation {
-  id: string;
-  productName: string;
-  batchSize: number;
-  batchUnit: string;
-  materials: FormulationMaterial[];
+  id: number;
+  product_name: string;
+  batch_size: number;
+  unit: string;
+  formulation_materials: FormulationMaterial[];
 }
 
 interface ScaledMaterial {
-  materialId: string;
-  name: string;
+  material_name: string;
   unit: string;
   scaledQuantity: number;
   pricePerUnit: number;
@@ -44,53 +46,98 @@ interface CalculationResult {
 export function ProductionCalculator() {
   const [formulations, setFormulations] = useState<Formulation[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
-  const [selectedFormulationId, setSelectedFormulationId] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [selectedFormulation, setSelectedFormulation] = useState<Formulation | null>(null);
+  const [productSearch, setProductSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+
   const [containerQuantity, setContainerQuantity] = useState('');
   const [containerSize, setContainerSize] = useState('');
   const [containerUnit, setContainerUnit] = useState('Litre');
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [customerName, setCustomerName] = useState('');
+  const [salePrice, setSalePrice] = useState('');
 
-  useEffect(() => {
-    const storedFormulations = localStorage.getItem('formulations');
-    if (storedFormulations) {
-      setFormulations(JSON.parse(storedFormulations));
-    }
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const storedMaterials = localStorage.getItem('rawMaterials');
-    if (storedMaterials) {
-      setRawMaterials(JSON.parse(storedMaterials));
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [rawMaterialsResponse, formulationsResponse] = await Promise.all([
+        supabase.from('rawMaterial').select('*').order('material-name', { ascending: true }),
+        supabase.from('formulations').select(`
+          *,
+          formulation_materials (*)
+        `).order('product_name', { ascending: true }),
+      ]);
+
+      if (rawMaterialsResponse.error) throw rawMaterialsResponse.error;
+      if (formulationsResponse.error) throw formulationsResponse.error;
+
+      setRawMaterials(rawMaterialsResponse.data || []);
+      setFormulations(formulationsResponse.data || []);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch data';
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  const handleCalculate = () => {
-    if (!selectedFormulationId || !containerQuantity || !containerSize) {
-      alert('Please fill in all fields');
-      return;
-    }
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-    const formulation = formulations.find((f) => f.id === selectedFormulationId);
-    if (!formulation) {
-      alert('Formulation not found');
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredFormulations = formulations.filter((f) =>
+    f.product_name.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  const handleSelectFormulation = (f: Formulation) => {
+    setSelectedFormulation(f);
+    setProductSearch(`${f.product_name} (${f.batch_size} ${f.unit})`);
+    setShowDropdown(false);
+  };
+
+  const getMaterialByName = (name: string) =>
+    rawMaterials.find((m) => m["material-name"] === name);
+
+  const handleCalculate = () => {
+    if (!selectedFormulation || !containerQuantity || !containerSize) {
+      alert('Please fill in all fields');
       return;
     }
 
     const qty = parseInt(containerQuantity);
     const size = parseFloat(containerSize);
     const totalVolume = qty * size;
-    const scaleFactor = totalVolume / formulation.batchSize;
+    const scaleFactor = totalVolume / selectedFormulation.batch_size;
 
-    const scaledMaterials: ScaledMaterial[] = formulation.materials.map((fm) => {
-      const material = rawMaterials.find((m) => m.id === fm.materialId);
+    const scaledMaterials: ScaledMaterial[] = selectedFormulation.formulation_materials.map((fm) => {
+      const material = getMaterialByName(fm.material_name);
       const scaledQty = fm.quantity * scaleFactor;
-      const lineCost = material ? material.pricePerUnit * scaledQty : 0;
+      const pricePerUnit = material?.["price-per-unit"] || 0;
+      const lineCost = pricePerUnit * scaledQty;
 
       return {
-        materialId: fm.materialId,
-        name: material?.name || 'Unknown',
+        material_name: fm.material_name,
         unit: material?.unit || '',
         scaledQuantity: scaledQty,
-        pricePerUnit: material?.pricePerUnit || 0,
+        pricePerUnit,
         lineCost,
       };
     });
@@ -98,7 +145,7 @@ export function ProductionCalculator() {
     const totalCost = scaledMaterials.reduce((sum, m) => sum + m.lineCost, 0);
 
     setCalculationResult({
-      formulation,
+      formulation: selectedFormulation,
       containerQuantity: qty,
       containerSize: size,
       containerUnit,
@@ -120,42 +167,66 @@ export function ProductionCalculator() {
       id: Date.now().toString(),
       date: new Date().toISOString(),
       customer: customerName,
-      product: calculationResult.formulation.productName,
+      product: calculationResult.formulation.product_name,
       containerQuantity: calculationResult.containerQuantity,
       containerSize: calculationResult.containerSize,
       containerUnit: calculationResult.containerUnit,
       totalVolume: calculationResult.totalVolume,
       rawMaterialCost: calculationResult.totalCost,
       materials: calculationResult.scaledMaterials,
+      salePricePerUnit: salePrice ? parseFloat(salePrice) : 0,
+      totalProfit: salePrice ? (parseFloat(salePrice) - (calculationResult.totalCost / calculationResult.totalVolume)) * calculationResult.totalVolume : 0,
     };
 
     orders.push(newOrder);
     localStorage.setItem('orders', JSON.stringify(orders));
 
     alert('Order saved to Order Book successfully!');
-    setCustomerName('');
-    setCalculationResult(null);
-    setSelectedFormulationId('');
-    setContainerQuantity('');
-    setContainerSize('');
+    handleReset();
   };
 
   const handleReset = () => {
     setCalculationResult(null);
-    setSelectedFormulationId('');
+    setSelectedFormulation(null);
+    setProductSearch('');
     setContainerQuantity('');
     setContainerSize('');
     setCustomerName('');
+    setSalePrice('');
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <p className="text-slate-600">Loading formulations from database...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl">
-      <div className="mb-6">
+      <div className="mb-6 mt-4">
         <h2 className="text-2xl font-bold text-slate-900">Production Calculator</h2>
         <p className="text-sm text-slate-600 mt-1">
           Calculate exact material quantities and costs for production orders
         </p>
       </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 rounded-xl border border-red-200 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <p className="text-sm text-red-800">{error}</p>
+          <button
+            onClick={fetchData}
+            className="ml-auto px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Input Section */}
@@ -166,22 +237,49 @@ export function ProductionCalculator() {
           </h3>
 
           <div className="space-y-4">
+            {/* Searchable product autocomplete */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Select Product
               </label>
-              <select
-                value={selectedFormulationId}
-                onChange={(e) => setSelectedFormulationId(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              >
-                <option value="">Choose a product...</option>
-                {formulations.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.productName} ({f.batchSize} {f.batchUnit})
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={dropdownRef}>
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={(e) => {
+                    setProductSearch(e.target.value);
+                    setSelectedFormulation(null);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="Type to search for a product..."
+                />
+
+                {showDropdown && productSearch.length > 0 && filteredFormulations.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {filteredFormulations.map((f) => (
+                      <button
+                        key={f.id}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleSelectFormulation(f)}
+                        className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm text-slate-800 border-b border-slate-100 last:border-0"
+                      >
+                        <span className="font-medium">{f.product_name}</span>
+                        <span className="text-slate-500 ml-1">
+                          ({f.batch_size} {f.unit})
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showDropdown && productSearch && filteredFormulations.length === 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg px-3 py-2 text-sm text-slate-500">
+                    No products found matching "{productSearch}"
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -265,7 +363,7 @@ export function ProductionCalculator() {
                   <div>
                     <p className="text-slate-600">Product</p>
                     <p className="font-semibold text-slate-900">
-                      {calculationResult.formulation.productName}
+                      {calculationResult.formulation.product_name}
                     </p>
                   </div>
                   <div>
@@ -303,7 +401,7 @@ export function ProductionCalculator() {
                       className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
                     >
                       <div className="flex-1">
-                        <p className="font-medium text-slate-900">{material.name}</p>
+                        <p className="font-medium text-slate-900">{material.material_name}</p>
                         <p className="text-xs text-slate-600">
                           {material.scaledQuantity.toFixed(2)} {material.unit} @ £
                           {material.pricePerUnit.toFixed(2)}/{material.unit}
@@ -320,15 +418,65 @@ export function ProductionCalculator() {
               </div>
 
               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-2">
                   <p className="font-semibold text-slate-900">Total Raw Material Cost</p>
                   <p className="text-2xl font-bold text-green-700">
                     £{calculationResult.totalCost.toFixed(2)}
                   </p>
                 </div>
+                <div className="flex items-center justify-between border-t border-green-200/60 pt-2">
+                  <p className="text-sm font-medium text-green-800">Purchase Price per {calculationResult.containerUnit}</p>
+                  <p className="text-sm font-bold text-green-800">
+                    £{(calculationResult.totalCost / calculationResult.totalVolume).toFixed(2)}
+                  </p>
+                </div>
                 <p className="text-xs text-slate-600 mt-2">
                   Excludes production, labour, packaging, and delivery costs
                 </p>
+              </div>
+
+              {/* Profitability Analysis Section */}
+              <div className="mt-6 border-t border-slate-200 pt-6">
+                <h4 className="text-md font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  Profitability Analysis
+                </h4>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Sale Price per {calculationResult.containerUnit} (£)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={salePrice}
+                    onChange={(e) => setSalePrice(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none max-w-xs"
+                    placeholder="e.g. 15.50"
+                  />
+                </div>
+
+                {salePrice && parseFloat(salePrice) > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
+                      <p className="text-sm text-slate-600 mb-1">Profit per {calculationResult.containerUnit}</p>
+                      <p className="text-xl font-bold text-slate-900">
+                        £{((parseFloat(salePrice) - (calculationResult.totalCost / calculationResult.totalVolume))).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
+                      <p className="text-sm text-slate-600 mb-1">Margin</p>
+                      <p className="text-xl font-bold text-slate-900">
+                        {(((parseFloat(salePrice) - (calculationResult.totalCost / calculationResult.totalVolume)) / parseFloat(salePrice)) * 100).toFixed(2)}%
+                      </p>
+                    </div>
+                    <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200 shadow-sm">
+                      <p className="text-sm text-indigo-700 mb-1">Total Order Profit</p>
+                      <p className="text-xl font-bold text-indigo-900">
+                        £{((parseFloat(salePrice) - (calculationResult.totalCost / calculationResult.totalVolume)) * calculationResult.totalVolume).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

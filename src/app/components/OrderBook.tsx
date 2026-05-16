@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Download, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { Search, Filter, Download, ChevronDown, ChevronUp, Calendar, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../../../utils/supabase';
 
 interface ScaledMaterial {
-  materialId: string;
-  name: string;
+  material_name: string;
   unit: string;
   scaledQuantity: number;
   pricePerUnit: number;
@@ -12,14 +12,14 @@ interface ScaledMaterial {
 
 interface Order {
   id: string;
-  date: string;
-  customer: string;
-  product: string;
-  containerQuantity: number;
-  containerSize: number;
-  containerUnit: string;
-  totalVolume: number;
-  rawMaterialCost: number;
+  date_received: string;
+  customer_name: string;
+  product_name: string;
+  container_quantity: number;
+  container_size: number;
+  container_unit: string;
+  total_volume: number;
+  raw_material_cost: number;
   materials: ScaledMaterial[];
 }
 
@@ -30,45 +30,61 @@ export function OrderBook() {
   const [filterCustomer, setFilterCustomer] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('order_book')
+        .select('*')
+        .order('date_received', { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const storedOrders = localStorage.getItem('orders');
-    if (storedOrders) {
-      setOrders(JSON.parse(storedOrders));
-    }
+    fetchOrders();
   }, []);
 
-  const uniqueProducts = Array.from(new Set(orders.map((o) => o.product)));
-  const uniqueCustomers = Array.from(new Set(orders.map((o) => o.customer)));
+  const uniqueProducts = Array.from(new Set(orders.map((o) => o.product_name)));
+  const uniqueCustomers = Array.from(new Set(orders.map((o) => o.customer_name)));
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       searchTerm === '' ||
-      order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product.toLowerCase().includes(searchTerm.toLowerCase());
+      order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.product_name.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesProduct = filterProduct === '' || order.product === filterProduct;
-    const matchesCustomer = filterCustomer === '' || order.customer === filterCustomer;
+    const matchesProduct = filterProduct === '' || order.product_name === filterProduct;
+    const matchesCustomer = filterCustomer === '' || order.customer_name === filterCustomer;
 
-    const orderDate = new Date(order.date);
+    const orderDate = new Date(order.date_received);
     const matchesDateFrom = dateRange.from === '' || orderDate >= new Date(dateRange.from);
     const matchesDateTo = dateRange.to === '' || orderDate <= new Date(dateRange.to);
 
     return matchesSearch && matchesProduct && matchesCustomer && matchesDateFrom && matchesDateTo;
   });
 
-  const totalOrdersValue = filteredOrders.reduce((sum, order) => sum + order.rawMaterialCost, 0);
+  const totalOrdersValue = filteredOrders.reduce((sum, order) => sum + Number(order.raw_material_cost), 0);
 
   const handleExport = () => {
     const csvContent = [
       ['Date', 'Customer', 'Product', 'Quantity', 'Total Volume', 'Raw Material Cost'],
       ...filteredOrders.map((order) => [
-        new Date(order.date).toLocaleDateString('en-GB'),
-        order.customer,
-        order.product,
-        `${order.containerQuantity} x ${order.containerSize} ${order.containerUnit}`,
-        `${order.totalVolume} ${order.containerUnit}`,
-        `£${order.rawMaterialCost.toFixed(2)}`,
+        new Date(order.date_received).toLocaleDateString('en-GB'),
+        order.customer_name,
+        order.product_name,
+        `${order.container_quantity} x ${order.container_size} ${order.container_unit}`,
+        `${order.total_volume} ${order.container_unit}`,
+        `£${Number(order.raw_material_cost).toFixed(2)}`,
       ]),
     ]
       .map((row) => row.join(','))
@@ -90,9 +106,37 @@ export function OrderBook() {
     setDateRange({ from: '', to: '' });
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-7xl flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <p className="text-slate-600">Loading order book...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl">
+        <div className="p-4 bg-red-50 rounded-xl border border-red-200 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <p className="text-sm text-red-800">{error}</p>
+          <button
+            onClick={fetchOrders}
+            className="ml-auto px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 mt-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Order Book</h2>
           <p className="text-sm text-slate-600 mt-1">
@@ -133,18 +177,20 @@ export function OrderBook() {
 
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">Product</label>
-            <select
-              value={filterProduct}
-              onChange={(e) => setFilterProduct(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-            >
-              <option value="">All products</option>
-              {uniqueProducts.map((product) => (
-                <option key={product} value={product}>
-                  {product}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={filterProduct}
+                onChange={(e) => setFilterProduct(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+              >
+                <option value="">All products</option>
+                {uniqueProducts.map((product) => (
+                  <option key={product} value={product}>
+                    {product}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -229,7 +275,7 @@ export function OrderBook() {
           </div>
         ) : (
           filteredOrders
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .sort((a, b) => new Date(b.date_received).getTime() - new Date(a.date_received).getTime())
             .map((order) => (
               <div
                 key={order.id}
@@ -240,7 +286,7 @@ export function OrderBook() {
                     <div>
                       <p className="text-xs text-slate-600">Date</p>
                       <p className="font-medium text-slate-900">
-                        {new Date(order.date).toLocaleDateString('en-GB', {
+                        {new Date(order.date_received).toLocaleDateString('en-GB', {
                           day: '2-digit',
                           month: 'short',
                           year: 'numeric',
@@ -249,25 +295,25 @@ export function OrderBook() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Customer</p>
-                      <p className="font-medium text-slate-900">{order.customer}</p>
+                      <p className="font-medium text-slate-900">{order.customer_name}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Product</p>
-                      <p className="font-medium text-slate-900">{order.product}</p>
+                      <p className="font-medium text-slate-900">{order.product_name}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Quantity</p>
                       <p className="font-medium text-slate-900">
-                        {order.containerQuantity} x {order.containerSize} {order.containerUnit}
+                        {order.container_quantity} x {order.container_size} {order.container_unit}
                       </p>
                       <p className="text-xs text-slate-600">
-                        Total: {order.totalVolume} {order.containerUnit}
+                        Total: {order.total_volume} {order.container_unit}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Raw Material Cost</p>
                       <p className="text-lg font-bold text-green-700">
-                        £{order.rawMaterialCost.toFixed(2)}
+                        £{Number(order.raw_material_cost).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -285,7 +331,7 @@ export function OrderBook() {
                   </button>
                 </div>
 
-                {expandedOrderId === order.id && (
+                {expandedOrderId === order.id && order.materials && order.materials.length > 0 && (
                   <div className="border-t border-slate-200 bg-slate-50 p-4">
                     <h4 className="font-semibold text-slate-900 mb-3">Material Breakdown</h4>
                     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -309,7 +355,7 @@ export function OrderBook() {
                         <tbody className="divide-y divide-slate-200">
                           {order.materials.map((material, index) => (
                             <tr key={index}>
-                              <td className="px-4 py-2 text-slate-900">{material.name}</td>
+                              <td className="px-4 py-2 text-slate-900">{material.material_name}</td>
                               <td className="px-4 py-2 text-right text-slate-600">
                                 {material.scaledQuantity.toFixed(2)} {material.unit}
                               </td>
@@ -326,7 +372,7 @@ export function OrderBook() {
                               Total
                             </td>
                             <td className="px-4 py-2 text-right text-slate-900">
-                              £{order.rawMaterialCost.toFixed(2)}
+                              £{Number(order.raw_material_cost).toFixed(2)}
                             </td>
                           </tr>
                         </tbody>

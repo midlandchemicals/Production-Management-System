@@ -156,33 +156,34 @@ export function ProductionCalculator() {
     });
   };
 
-  const handleSaveToOrderBook = () => {
+  const handleSaveToOrderBook = async () => {
     if (!calculationResult || !customerName) {
       alert('Please enter customer name');
       return;
     }
 
-    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-    const newOrder = {
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-      customer: customerName,
-      product: calculationResult.formulation.product_name,
-      containerQuantity: calculationResult.containerQuantity,
-      containerSize: calculationResult.containerSize,
-      containerUnit: calculationResult.containerUnit,
-      totalVolume: calculationResult.totalVolume,
-      rawMaterialCost: calculationResult.totalCost,
-      materials: calculationResult.scaledMaterials,
-      salePricePerUnit: salePrice ? parseFloat(salePrice) : 0,
-      totalProfit: salePrice ? (parseFloat(salePrice) - (calculationResult.totalCost / calculationResult.totalVolume)) * calculationResult.totalVolume : 0,
-    };
+    try {
+      const { error } = await supabase
+        .from('order_book')
+        .insert({
+          date_received: new Date().toISOString(),
+          customer_name: customerName,
+          product_name: calculationResult.formulation.product_name,
+          container_quantity: calculationResult.containerQuantity,
+          container_size: calculationResult.containerSize,
+          container_unit: calculationResult.containerUnit,
+          total_volume: calculationResult.totalVolume,
+          raw_material_cost: calculationResult.totalCost,
+          materials: calculationResult.scaledMaterials
+        });
 
-    orders.push(newOrder);
-    localStorage.setItem('orders', JSON.stringify(orders));
-
-    alert('Order saved to Order Book successfully!');
-    handleReset();
+      if (error) throw error;
+      
+      alert('Order saved to Order Book successfully!');
+      handleReset();
+    } catch (err: any) {
+      alert(`Failed to save order: ${err.message}`);
+    }
   };
 
   const handleReset = () => {

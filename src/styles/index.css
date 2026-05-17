@@ -1,3 +1,9 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+button:not(:disabled),
+a,
+[role="button"] {
+  cursor: pointer;
+}

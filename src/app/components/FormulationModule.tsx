@@ -19,7 +19,7 @@ interface RawMaterial {
 interface FormulationMaterial {
   id?: number;
   material_name: string;
-  quantity: number;
+  quantity: number | '';
   formulation_id?: number;
 }
 
@@ -82,7 +82,7 @@ export function FormulationModule() {
   const handleAddMaterial = () => {
     setFormulationMaterials([
       ...formulationMaterials,
-      { material_name: '', quantity: 0 },
+      { material_name: '', quantity: 1 },
     ]);
   };
 
@@ -420,9 +420,11 @@ export function FormulationModule() {
                       <div className="w-40">
                         <input
                           type="number"
-                          step="0.01"
+                          min="1"
                           value={fm.quantity}
-                          onChange={(e) => handleMaterialChange(index, 'quantity', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleMaterialChange(index, 'quantity', e.target.value === ''
+                            ? ''
+                            : parseInt(e.target.value, 10))}
                           className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                           placeholder="Quantity"
                         />

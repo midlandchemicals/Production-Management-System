@@ -357,15 +357,13 @@ export function FormulationModule() {
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Batch Size
                   </label>
-                  <select
+                  <input
+                    type="number"
                     value={formData.batchSize}
                     onChange={(e) => setFormData({ ...formData, batchSize: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  >
-                    {[100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map(size => (
-                      <option key={size} value={size}>{size}</option>
-                    ))}
-                  </select>
+                    placeholder="e.g. 1000"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">

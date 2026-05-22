@@ -114,7 +114,7 @@ export function ProductionCalculator() {
 
   const handleSelectFormulation = (f: Formulation) => {
     setSelectedFormulation(f);
-    setProductSearch(`${f.product_name} (${f.batch_size} ${f.unit})`);
+    setProductSearch(f.product_name);
     setShowDropdown(false);
   };
 
@@ -280,9 +280,6 @@ export function ProductionCalculator() {
                         className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm text-slate-800 border-b border-slate-100 last:border-0"
                       >
                         <span className="font-medium">{f.product_name}</span>
-                        <span className="text-slate-500 ml-1">
-                          ({f.batch_size} {f.unit})
-                        </span>
                       </button>
                     ))}
                   </div>

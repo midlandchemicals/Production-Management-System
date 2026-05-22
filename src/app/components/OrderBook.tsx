@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Download, ChevronDown, ChevronUp, Calendar, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Filter, Download, ChevronDown, ChevronUp, Calendar, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
 
 interface ScaledMaterial {
@@ -53,6 +53,24 @@ export function OrderBook() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!window.confirm('Are you sure you want to delete this order?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('order_book')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+      
+      setOrders(orders.filter(order => order.id !== orderId));
+      if (expandedOrderId === orderId) setExpandedOrderId(null);
+    } catch (err: any) {
+      alert(`Failed to delete order: ${err.message}`);
+    }
+  };
 
   const uniqueProducts = Array.from(new Set(orders.map((o) => o.product_name)));
   const uniqueCustomers = Array.from(new Set(orders.map((o) => o.customer_name)));
@@ -317,18 +335,27 @@ export function OrderBook() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() =>
-                      setExpandedOrderId(expandedOrderId === order.id ? null : order.id)
-                    }
-                    className="ml-4 p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    {expandedOrderId === order.id ? (
-                      <ChevronUp className="w-5 h-5" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5" />
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1 ml-4">
+                    <button
+                      onClick={() => handleDeleteOrder(order.id)}
+                      className="p-2 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                      title="Delete Order"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() =>
+                        setExpandedOrderId(expandedOrderId === order.id ? null : order.id)
+                      }
+                      className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      {expandedOrderId === order.id ? (
+                        <ChevronUp className="w-5 h-5" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {expandedOrderId === order.id && order.materials && order.materials.length > 0 && (

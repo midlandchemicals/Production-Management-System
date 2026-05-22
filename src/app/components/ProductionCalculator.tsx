@@ -41,6 +41,9 @@ interface CalculationResult {
   scaleFactor: number;
   scaledMaterials: ScaledMaterial[];
   totalCost: number;
+  packagingCost: number;
+  otherCost: number;
+  finalCost: number;
 }
 
 export function ProductionCalculator() {
@@ -55,6 +58,8 @@ export function ProductionCalculator() {
 
   const [containerQuantity, setContainerQuantity] = useState('');
   const [containerSize, setContainerSize] = useState('');
+  const [packagingCost, setPackagingCost] = useState('');
+  const [otherCost, setOtherCost] = useState('');
   const [containerUnit, setContainerUnit] = useState('Litre');
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [customerName, setCustomerName] = useState('');
@@ -143,6 +148,9 @@ export function ProductionCalculator() {
     });
 
     const totalCost = scaledMaterials.reduce((sum, m) => sum + m.lineCost, 0);
+    const packCost = packagingCost ? parseFloat(packagingCost) : 0;
+    const othCost = otherCost ? parseFloat(otherCost) : 0;
+    const finalCost = totalCost + packCost + othCost;
 
     setCalculationResult({
       formulation: selectedFormulation,
@@ -153,6 +161,9 @@ export function ProductionCalculator() {
       scaleFactor,
       scaledMaterials,
       totalCost,
+      packagingCost: packCost,
+      otherCost: othCost,
+      finalCost,
     });
   };
 
@@ -173,7 +184,7 @@ export function ProductionCalculator() {
           container_size: calculationResult.containerSize,
           container_unit: calculationResult.containerUnit,
           total_volume: calculationResult.totalVolume,
-          raw_material_cost: calculationResult.totalCost,
+          raw_material_cost: calculationResult.finalCost,
           materials: calculationResult.scaledMaterials
         });
 
@@ -192,6 +203,8 @@ export function ProductionCalculator() {
     setProductSearch('');
     setContainerQuantity('');
     setContainerSize('');
+    setPackagingCost('');
+    setOtherCost('');
     setCustomerName('');
     setSalePrice('');
   };
@@ -309,6 +322,32 @@ export function ProductionCalculator() {
                   placeholder="e.g. 1000"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Total Packaging Cost (£)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={packagingCost}
+                  onChange={(e) => setPackagingCost(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="e.g. 50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Total Other Cost (£)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={otherCost}
+                  onChange={(e) => setOtherCost(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="e.g. 25"
+                />
+              </div>
             </div>
 
             <div>
@@ -421,18 +460,36 @@ export function ProductionCalculator() {
               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex items-center justify-between mb-2">
                   <p className="font-semibold text-slate-900">Total Raw Material Cost</p>
-                  <p className="text-2xl font-bold text-green-700">
+                  <p className="text-xl font-bold text-green-700">
                     £{calculationResult.totalCost.toFixed(2)}
                   </p>
                 </div>
+                {(calculationResult.packagingCost > 0 || calculationResult.otherCost > 0) && (
+                  <>
+                    <div className="flex items-center justify-between mb-2 text-sm">
+                      <p className="text-slate-700">Packaging Cost</p>
+                      <p className="font-medium text-slate-900">£{calculationResult.packagingCost.toFixed(2)}</p>
+                    </div>
+                    <div className="flex items-center justify-between mb-2 text-sm">
+                      <p className="text-slate-700">Other Cost</p>
+                      <p className="font-medium text-slate-900">£{calculationResult.otherCost.toFixed(2)}</p>
+                    </div>
+                  </>
+                )}
+                <div className="flex items-center justify-between border-t border-green-200/60 pt-2 mb-2">
+                  <p className="font-bold text-slate-900">Total Production Cost</p>
+                  <p className="text-2xl font-bold text-green-800">
+                    £{calculationResult.finalCost.toFixed(2)}
+                  </p>
+                </div>
                 <div className="flex items-center justify-between border-t border-green-200/60 pt-2">
-                  <p className="text-sm font-medium text-green-800">Purchase Price per {calculationResult.containerUnit}</p>
+                  <p className="text-sm font-medium text-green-800">Cost per {calculationResult.containerUnit}</p>
                   <p className="text-sm font-bold text-green-800">
-                    £{(calculationResult.totalCost / calculationResult.totalVolume).toFixed(2)}
+                    £{(calculationResult.finalCost / calculationResult.totalVolume).toFixed(2)}
                   </p>
                 </div>
                 <p className="text-xs text-slate-600 mt-2">
-                  Excludes production, labour, packaging, and delivery costs
+                  Includes production, packaging, and other specified costs.
                 </p>
               </div>
 
@@ -461,19 +518,19 @@ export function ProductionCalculator() {
                     <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
                       <p className="text-sm text-slate-600 mb-1">Profit per {calculationResult.containerUnit}</p>
                       <p className="text-xl font-bold text-slate-900">
-                        £{((parseFloat(salePrice) - (calculationResult.totalCost / calculationResult.totalVolume))).toFixed(2)}
+                        £{((parseFloat(salePrice) - (calculationResult.finalCost / calculationResult.totalVolume))).toFixed(2)}
                       </p>
                     </div>
                     <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
                       <p className="text-sm text-slate-600 mb-1">Margin</p>
                       <p className="text-xl font-bold text-slate-900">
-                        {(((parseFloat(salePrice) - (calculationResult.totalCost / calculationResult.totalVolume)) / parseFloat(salePrice)) * 100).toFixed(2)}%
+                        {(((parseFloat(salePrice) - (calculationResult.finalCost / calculationResult.totalVolume)) / parseFloat(salePrice)) * 100).toFixed(2)}%
                       </p>
                     </div>
                     <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200 shadow-sm">
                       <p className="text-sm text-indigo-700 mb-1">Total Order Profit</p>
                       <p className="text-xl font-bold text-indigo-900">
-                        £{((parseFloat(salePrice) - (calculationResult.totalCost / calculationResult.totalVolume)) * calculationResult.totalVolume).toFixed(2)}
+                        £{((parseFloat(salePrice) - (calculationResult.finalCost / calculationResult.totalVolume)) * calculationResult.totalVolume).toFixed(2)}
                       </p>
                     </div>
                   </div>

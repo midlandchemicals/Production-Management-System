@@ -4,6 +4,7 @@ import { FormulationModule } from "./components/FormulationModule";
 import { ProductionCalculator } from "./components/ProductionCalculator";
 import { OrderBook } from "./components/OrderBook";
 import { Lock, Database, Calculator, BookOpen } from "lucide-react";
+import LogoImage from "../assets/Logo.png";
 
 export default function App() {
   const [activeModule, setActiveModule] = useState("materials");
@@ -131,10 +132,8 @@ export default function App() {
     return (
       <div className="size-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-2xl border border-slate-200">
-          <div className="flex items-center justify-center mb-8">
-            <div className="p-4 bg-blue-600 rounded-full">
-              <Lock className="w-8 h-8 text-white" />
-            </div>
+          <div className="flex items-center justify-center  mb-8">
+            <img src={LogoImage} alt="Midland Chemicals" className="w-72 md:w-80 h-auto object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-center text-slate-900 mb-2">
             Production Management System
@@ -281,10 +280,8 @@ export default function App() {
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 shadow-sm">
         <div className="flex items-center justify-between max-w-screen-2xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <Database className="w-6 h-6 text-white" />
-            </div>
+          <div className="flex items-center gap-6">
+            <img src={LogoImage} alt="Midland Chemicals" className="w-30 h-auto object-contain" />
             <div>
               <h1 className="text-xl font-bold text-slate-900">
                 Production Management System

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Save, X, ChevronDown, ChevronUp, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, X, ChevronDown, ChevronUp, Loader2, AlertCircle, Copy } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
 import {
   Select,
@@ -58,7 +58,7 @@ export function FormulationModule() {
         supabase.from('formulations').select(`
           *,
           formulation_materials (*)
-        `).order('product_name', { ascending: true })
+        `).order('id', { ascending: false })
       ]);
 
       if (rawMaterialsResponse.error) throw rawMaterialsResponse.error;
@@ -136,11 +136,11 @@ export function FormulationModule() {
       if (materialsError) throw materialsError;
 
       setFormulations(prev => [
-        ...prev,
         {
           ...newFormulation,
           formulation_materials: insertedMaterials || []
-        }
+        },
+        ...prev
       ]);
       resetForm();
     } catch (err: unknown) {
@@ -257,6 +257,54 @@ export function FormulationModule() {
 
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDuplicate = async (id: number) => {
+    const formulationToDuplicate = formulations.find((f) => f.id === id);
+    if (!formulationToDuplicate) return;
+
+    if (!confirm("Duplicate formulation?")) return;
+
+    setSaving(true);
+    try {
+      const { data: newFormulation, error: formulationError } = await supabase
+        .from('formulations')
+        .insert({
+          product_name: `${formulationToDuplicate.product_name} (Copy)`,
+          batch_size: formulationToDuplicate.batch_size,
+          unit: formulationToDuplicate.unit,
+        })
+        .select()
+        .single();
+
+      if (formulationError) throw formulationError;
+
+      const materialsToInsert = formulationToDuplicate.formulation_materials.map(fm => ({
+        material_name: fm.material_name,
+        quantity: fm.quantity,
+        formulation_id: newFormulation.id
+      }));
+
+      const { data: insertedMaterials, error: materialsError } = await supabase
+        .from('formulation_materials')
+        .insert(materialsToInsert)
+        .select();
+
+      if (materialsError) throw materialsError;
+
+      setFormulations(prev => [
+        {
+          ...newFormulation,
+          formulation_materials: insertedMaterials || []
+        },
+        ...prev
+      ]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to duplicate formulation';
+      alert(`Error duplicating formulation: ${message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -494,12 +542,21 @@ export function FormulationModule() {
                   <button
                     onClick={() => handleEdit(formulation.id)}
                     className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Edit Formulation"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
+                    onClick={() => handleDuplicate(formulation.id)}
+                    className="p-2 text-slate-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    title="Duplicate Formulation"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => handleDelete(formulation.id)}
                     className="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete Formulation"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
